@@ -4,13 +4,14 @@ package code4romania.czl.scrapers.comunicatii;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jdk.nashorn.internal.ir.debug.JSONWriter;
+import okhttp3.*;
 import org.codehaus.jackson.annotate.JsonAutoDetect;
 
+import java.io.IOException;
 import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 /**
  * Created by radug on 11/03/2017.
@@ -53,11 +54,20 @@ public class ComunicatiiBean {
     }
 
     String type;
-    String institution;
+    String institution = "MCSI";
     String date;
     String description;
-    String feedback_days;
-    String contact;
+    String feedback_days = "0";
+    String contact = "[\"email\":\"propuneri@comunicatii.gov.ro\"]";
+    public String getIssuer() {
+        return issuer;
+    }
+
+    public void setIssuer(String issuer) {
+        this.issuer = issuer;
+    }
+
+    String issuer = "comunicatii";
 
     List<Document> documents;
 
@@ -130,6 +140,20 @@ public class ComunicatiiBean {
         this.date = date;
     }
 
+    public void setDate(String date, String fmt){
+
+        DateTimeFormatter in = DateTimeFormatter.ofPattern(fmt);
+        DateTimeFormatter out = DateTimeFormatter.ofPattern("2017-03-08");
+        try {
+            LocalDate localDate = LocalDate.parse(date, in);
+
+            this.date = localDate.format(out).toString();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+     }
+
+
     public String getDescription() {
         return description;
     }
@@ -146,14 +170,13 @@ public class ComunicatiiBean {
         this.feedback_days = feedback_days;
     }
 
-    public String getContact() {
-        return contact;
-    }
+   public String getContact() {
+       return contact;
+   }
 
     public void setContact(String contact) {
         this.contact = contact;
     }
-
     public List<Document> getDocuments() {
         if (documents == null){
             documents = new ArrayList<Document>();
@@ -183,4 +206,6 @@ public class ComunicatiiBean {
 
         return "{}";
     }
+
+
 }

@@ -1,5 +1,8 @@
 package code4romania.czl.scrapers.comunicatii;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -35,8 +38,8 @@ public class ScraperComunicatii {
         String url = "http://www.comunicatii.gov.ro/?page_id=3517";
         Document document = null;
         try {
-//            document = Jsoup.connect(url).get();
-            document = Jsoup.parse(ScraperComunicatii.class.getResourceAsStream("/Proiecte de Acte Normative _ Comunicatii.gov.ro.html"), "UTF-8","");
+            document = Jsoup.connect(url).get();
+//            document = Jsoup.parse(ScraperComunicatii.class.getResourceAsStream("/Proiecte de Acte Normative _ Comunicatii.gov.ro.html"), "UTF-8","");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -59,7 +62,6 @@ public class ScraperComunicatii {
 
                                     ComunicatiiBean cBean = new ComunicatiiBean();
                                     outputList.add(cBean);
-                                    cBean.setIdentifier(new UID().toString());
 //                                    System.out.print("-------------------------");
                                     //System.out.println(groupedElements.size());
                                     StringBuffer description = new StringBuffer();
@@ -88,7 +90,10 @@ public class ScraperComunicatii {
                                     String start = extractFeedbackDate(cBean.getDescription(), DATE_PUBLICARE_REGEX);
 
                                     cBean.setFeedback_days(calculateFeedbackDays(start, feedback));
+                                    cBean.setType(deductType(description.toString()));
 //                                    System.out.println(cBean.toJson());
+
+                                    cBean.setIdentifier(new UID().toString()+":"+cBean.getType()+":"+cBean.getDate());
                                     groupedElements.clear();
                                 }else{
                                     if(StringUtils.isNotBlank(item.toString())) {
@@ -102,11 +107,18 @@ public class ScraperComunicatii {
                 }
         );
 
-        outputList.forEach(el -> System.out.println(el.toJson()));
-//        Elements paragraphs = document.select("p");
-//        paragraphs.forEach(p -> System.out.println(p.toString()));
-//        selectLinks(document);
-    }
+        outputList.forEach(el -> {
+            System.out.println(el.toJson());
+            System.out.println("sending");
+                    try {
+                        String result = post("http://czl-api.code4.ro/api/publications/", el.toJson());
+                        System.out.println(result);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+       }
 
     private static void extractDate(ComunicatiiBean cBean) {
         Pattern p = Pattern.compile(DATE_REGEX);
@@ -114,7 +126,7 @@ public class ScraperComunicatii {
         Matcher matcher = p.matcher(cBean.getDescription());
         while (matcher.find()){
             String date = cBean.getDate();
-            cBean.setDate(matcher.group() + "|" + date);
+            cBean.setDate(matcher.group(), "dd.MM.yyyy");
             System.out.println( matcher.group());
         }
     }
@@ -182,7 +194,6 @@ public class ScraperComunicatii {
 
     public static String calculateFeedbackDays(String dataPublicare, String dataFeedback){
         // Converting date to Java8 Local date
-        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         try {
             LocalDate startDate = LocalDate.parse(dataPublicare, fmt);
@@ -194,6 +205,37 @@ public class ScraperComunicatii {
         }catch (Exception e){
             e.printStackTrace();
         }
-        return "";
+        return "0";
+    }
+
+    public static String deductType(String description){
+        String type ="";
+        if (description.contains("Proiect de Lege")){
+            type = type + "LEGE";
+        }
+        if (description.contains("Ordonanță") || description.contains("Ordonanţă")){
+            type = type + "OG";
+        }
+        if (description.contains("Hotărâre")){
+            type = type + "HG";
+        }
+        return  type;
+    }
+
+    public static final MediaType JSON
+            = MediaType.parse("application/json; charset=utf-8");
+
+    static OkHttpClient client = new OkHttpClient();
+
+    static String post(String url, String json) throws IOException {
+        RequestBody body = RequestBody.create(JSON, json);
+        Request request = new Request.Builder()
+                .addHeader("Authorization", "token comunicatii-very-secret-key")
+                .addHeader("Content-Type", "application/json; charset=utf-8")
+                .url(url)
+                .post(body)
+                .build();
+        Response response = client.newCall(request).execute();
+        return response.body().string();
     }
 }
