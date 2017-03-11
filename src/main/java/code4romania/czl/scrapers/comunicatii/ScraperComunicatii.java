@@ -8,6 +8,7 @@ import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.rmi.server.UID;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -58,11 +59,10 @@ public class ScraperComunicatii {
 
                                     ComunicatiiBean cBean = new ComunicatiiBean();
                                     outputList.add(cBean);
-
+                                    cBean.setIdentifier(new UID().toString());
 //                                    System.out.print("-------------------------");
                                     //System.out.println(groupedElements.size());
                                     StringBuffer description = new StringBuffer();
-                                    cBean.setTitle(getTextFromNode(groupedElements.get(0)));
 
                                     groupedElements.forEach(gEl -> {
                                         gEl.childNodes().forEach(cNode ->{
@@ -72,6 +72,7 @@ public class ScraperComunicatii {
                                                     description.append(cNode.toString());
                                                 break;}
                                                 case "a": {
+                                                    description.append(getTextFromNode(cNode));
                                                     cBean.addDocument(cNode.attr("href"), getTextFromNode(cNode));
                                                 }
                                             }
@@ -80,6 +81,8 @@ public class ScraperComunicatii {
                                         });
                                     });
                                     cBean.setDescription(description.toString());
+                                    cBean.setTitle(getTextFromNode(groupedElements.get(0)));
+
                                     extractDate(cBean);
                                     String feedback = extractFeedbackDate(cBean.getDescription(), DATE_FEEDBACK_REGEX);
                                     String start = extractFeedbackDate(cBean.getDescription(), DATE_PUBLICARE_REGEX);
@@ -135,8 +138,9 @@ public class ScraperComunicatii {
     private static String getTextFromNode(Node cNode) {
         StringBuffer text = new StringBuffer();
         cNode.childNodes().forEach(node -> {
-            if ("#text".equalsIgnoreCase(node.nodeName())){
-                text.append(node.toString());
+            switch (node.nodeName()){
+                case "#text": text.append(node.toString());break;
+                case "a" : text.append(getTextFromNode(node));break;
             }
         });
         return text.toString();
